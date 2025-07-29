@@ -26,25 +26,12 @@ void _debugOutput(Object message) {
   }
 }
 
-/// You will see a rather esoteric looking test `(const Object() is! T)` at several places
-/// /// it tests if [T] is a real type and not Object or dynamic
-
-/// For each registered factory/singleton a [_ServiceFactory<T>] is created
-/// it holds either the instance of a Singleton or/and the creation functions
-/// for creating an instance when [get] is called
-///
-/// There are three different types
-enum _ServiceFactoryType {
-  alwaysNew,
-
-  /// factory which means on every call of [get] a new instance is created
-  constant, // normal singleton
-  lazy, // lazy
-}
+typedef _ServiceFactoryType = ServiceFactoryType;
 
 /// If I use `Singleton` without specifier in the comments I mean normal and lazy
 
-class _ServiceFactory<T extends Object, P1, P2> {
+class _ServiceFactory<T extends Object, P1, P2> extends ServiceFactory<T> {
+  @override
   final _ServiceFactoryType factoryType;
 
   final _GetItImplementation _getItInstance;
@@ -65,16 +52,20 @@ class _ServiceFactory<T extends Object, P1, P2> {
   final DisposingFunc<T>? disposeFunction;
 
   /// In case of a named registration the instance name is here stored for easy access
+  @override
   final String? instanceName;
 
   /// true if one of the async registration functions have been used
+  @override
   final bool isAsync;
 
   /// If an existing Object gets registered or an async/lazy Singleton has finished
   /// its creation, it is stored here
+  @override
   Object? instance;
 
   /// the type that was used when registering, used for runtime checks
+  @override
   late final Type registrationType;
 
   /// to enable Singletons to signal that they are ready (their initialization is finished)
@@ -87,12 +78,16 @@ class _ServiceFactory<T extends Object, P1, P2> {
   /// they are stored here
   final List<Type> objectsWaiting = [];
 
+  @override
   bool get isReady => _readyCompleter.isCompleted;
 
+  @override
   bool get isNamedRegistration => instanceName != null;
 
+  @override
   String get debugName => '$instanceName : $registrationType';
 
+  @override
   bool get canBeWaitedFor =>
       shouldSignalReady || pendingResult != null || isAsync;
 
@@ -1230,19 +1225,25 @@ class _GetItImplementation implements GetIt {
     }
   }
 
+  @override
+  ServiceFactory? findFirstFactory<T extends Object>(
+      {Object? instance, String? instanceName}) {
+    if (instance != null) {
+      return _findFirstFactoryByInstanceOrNull(instance);
+    } else {
+      return _findFirstFactoryByNameAndTypeOrNull<T>(instanceName);
+    }
+  }
+
   /// Tests if an [instance] of an object or aType [T] or a name [instanceName]
   /// is registered inside GetIt
   @override
   bool isRegistered<T extends Object>({
     Object? instance,
     String? instanceName,
-  }) {
-    if (instance != null) {
-      return _findFirstFactoryByInstanceOrNull(instance) != null;
-    } else {
-      return _findFirstFactoryByNameAndTypeOrNull<T>(instanceName) != null;
-    }
-  }
+  }) =>
+      findFirstFactory<T>(instance: instance, instanceName: instanceName) !=
+      null;
 
   /// Unregister an instance of an object or a factory/singleton by Type [T] or by name [instanceName]
   /// if you need to dispose any resources you can do it using [disposingFunction] function
